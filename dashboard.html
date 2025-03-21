@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPA PRO Dashboard</title>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Boxicons CSS -->
+  <link href="https://unpkg.com/boxicons@2.1.2/css/boxicons.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+  <nav>
+    <div class="logo">
+      <i class="bx bx-menu menu-icon"></i>
+      <span class="logo-name">GPA PRO</span>
+    </div>
+
+    <div class="sidebar">
+      <div class="logo">
+        <i class="bx bx-menu menu-icon"></i>
+        <span class="logo-name">GPA PRO</span>
+      </div>
+
+      <div class="sidebar-content">
+        <ul class="lists">
+          <li class="list">
+            <a href="#" class="nav-link active-link">
+              <i class="bx bx-home-alt icon"></i>
+              <span class="link">Dashboard</span>
+            </a>
+          </li>
+          <li class="list">
+            <a href="sgpa_calculator.html" class="nav-link">
+              <i class="bx bx-calculator icon"></i>
+              <span class="link">SGPA Calculator</span>
+            </a>
+          </li>
+          <li class="list">
+            <a href="cgpa_calculator.html" class="nav-link">
+              <i class="bx bx-calculator icon"></i>
+              <span class="link">CGPA Calculator</span>
+            </a>
+          </li>
+          <li class="list">
+            <a href="profile.html" class="nav-link">
+              <i class="bx bx-user icon"></i>
+              <span class="link">Profile</span>
+            </a>
+          </li>
+        </ul>
+
+        <div class="bottom-content">
+          <li class="list">
+            <a href="/logout.php" class="nav-link">
+              <i class="bx bx-log-out icon"></i>
+              <span class="link">Logout</span>
+            </a>
+          </li>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <section class="overlay"></section>
+  <div class="toast-container"></div> <!-- Toast container -->
+  
+  <div class="content">
+    <div class="dashboard-header">
+      <h1>Academic Performance</h1>
+      <p>View and manage your academic records</p>
+    </div>
+    
+    <div class="dashboard"></div>
+  </div>
+
+  <!-- Modal for Editing -->
+  <div class="modal-overlay" id="modalOverlay"></div>
+  <div class="modal-container" id="modalContainer">
+    <div class="modal-header">
+      <h2 id="modalTitle">Edit Details</h2>
+      <button class="close-modal" id="closeModal">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-content" id="modalContent">
+      <!-- Content will be dynamically inserted here -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="cancelModal">Cancel</button>
+      <button class="btn btn-save" id="saveModal">Save Changes</button>
+    </div>
+  </div>
+    
+  <script src="check_login.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Function to fetch SGPA data from the server
+      function fetchSGPAData() {
+        // Make an AJAX request to fetch SGPA data
+        fetch('/fetch_sgpa_data.php')
+          .then(response => response.json())
+          .then(data => {
+            // Call function to generate HTML content with the received data
+            generateSGPAHTML(data);
+          })
+          .catch(error => {
+            console.error('Error fetching SGPA data:', error);
+            // Show error message in dashboard
+            const dashboard = document.querySelector('.dashboard');
+            dashboard.innerHTML = `
+              <div class="error-message">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Error loading data. Please try again later.</p>
+              </div>
+            `;
+          });
+      }
+
+      // Function to generate HTML content with SGPA data
+      function generateSGPAHTML(data) {
+        const dashboard = document.querySelector('.dashboard');
+        dashboard.innerHTML = '';
+
+        if (!data || Object.keys(data).length === 0) {
+          const emptyState = document.createElement('div');
+          emptyState.classList.add('empty-state');
+          emptyState.innerHTML = `
+            <div class="empty-icon">
+              <i class="fas fa-graduation-cap"></i>
+            </div>
+            <h2>No SGPA details saved</h2>
+            <p>Start by adding your semester grades in the SGPA Calculator</p>
+            <a href="sgpa_calculator.html" class="btn btn-primary">Go to SGPA Calculator</a>
+          `;
+          dashboard.appendChild(emptyState);
+          return;
+        }
+
+        // Create dashboard grid
+        const dashboardGrid = document.createElement('div');
+        dashboardGrid.classList.add('dashboard-grid');
+        
+        // Loop through institutions
+        for (const institution in data) {
+          if (data.hasOwnProperty(institution)) {
+            const programs = data[institution];
+
+            // Create institution card
+            const institutionCard = document.createElement('div');
+            institutionCard.classList.add('institution-card');
+            
+            // Create institution header
+            const institutionHeader = document.createElement('div');
+            institutionHeader.classList.add('institution-header');
+            
+            const institutionName = document.createElement('h2');
+            institutionName.classList.add('institution-name');
+            institutionName.textContent = institution;
+            
+            const institutionActions = document.createElement('div');
+            institutionActions.classList.add('card-actions');
+            
+            const editInstitutionBtn = document.createElement('button');
+            editInstitutionBtn.classList.add('action-btn', 'edit-btn');
+            editInstitutionBtn.innerHTML = '<i class="fas fa-edit"></i>';
+            editInstitutionBtn.title = 'Edit Institution';
+            editInstitutionBtn.addEventListener('click', function() {
+              openEditModal('institution', institution);
+            });
+            
+            const deleteInstitutionBtn = document.createElement('button');
+            deleteInstitutionBtn.classList.add('action-btn', 'delete-btn');
+            deleteInstitutionBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            deleteInstitutionBtn.title = 'Delete Institution';
+            deleteInstitutionBtn.addEventListener('click', function() {
+              openDeleteModal('institution', institution);
+            });
+            
+            institutionActions.appendChild(editInstitutionBtn);
+            institutionActions.appendChild(deleteInstitutionBtn);
+            
+            institutionHeader.appendChild(institutionName);
+            institutionHeader.appendChild(institutionActions);
+            institutionCard.appendChild(institutionHeader);
+            
+            // Create programs container
+            const programsContainer = document.createElement('div');
+            programsContainer.classList.add('programs-container');
+            
+            // Loop through programs
+            for (const program in programs) {
+              if (programs.hasOwnProperty(program)) {
+                const semesters = programs[program];
+                
+                // Create program section
+                const programSection = document.createElement('div');
+                programSection.classList.add('program-section');
+                
+                // Create program header
+                const programHeader = document.createElement('div');
+                programHeader.classList.add('program-header');
+                
+                const programInfo = document.createElement('div');
+                programInfo.classList.add('program-info');
+                
+                const programName = document.createElement('h3');
+                programName.classList.add('program-name');
+                programName.textContent = program;
+                
+                // Calculate CGPA
+                const cgpa = calculateCGPA(semesters);
+                const cgpaValue = document.createElement('div');
+                cgpaValue.classList.add('cgpa-badge');
+                cgpaValue.textContent = `CGPA: ${cgpa}`;
+                
+                programInfo.appendChild(programName);
+                programInfo.appendChild(cgpaValue);
+                
+                const programActions = document.createElement('div');
+                programActions.classList.add('card-actions');
+                
+                const editProgramBtn = document.createElement('button');
+                editProgramBtn.classList.add('action-btn', 'edit-btn');
+                editProgramBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                editProgramBtn.title = 'Edit Program';
+                editProgramBtn.addEventListener('click', function() {
+                  openEditModal('program', program, institution);
+                });
+                
+                const deleteProgramBtn = document.createElement('button');
+                deleteProgramBtn.classList.add('action-btn', 'delete-btn');
+                deleteProgramBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                deleteProgramBtn.title = 'Delete Program';
+                deleteProgramBtn.addEventListener('click', function() {
+                  openDeleteModal('program', program, institution);
+                });
+                
+                programActions.appendChild(editProgramBtn);
+                programActions.appendChild(deleteProgramBtn);
+                
+                programHeader.appendChild(programInfo);
+                programHeader.appendChild(programActions);
+                programSection.appendChild(programHeader);
+                
+                // Create semesters container
+                const semestersContainer = document.createElement('div');
+                semestersContainer.classList.add('semesters-container');
+                
+                // Sort semesters by number
+                const sortedSemesters = [...semesters].sort((a, b) => {
+                  const semA = parseInt(a.semester.replace(/\D/g, ''));
+                  const semB = parseInt(b.semester.replace(/\D/g, ''));
+                  return semA - semB;
+                });
+                
+                // Loop through semesters
+                sortedSemesters.forEach(semester => {
+                  // Create semester card
+                  const semesterCard = document.createElement('div');
+                  semesterCard.classList.add('semester-card');
+                  
+                  // Create semester header
+                  const semesterHeader = document.createElement('div');
+                  semesterHeader.classList.add('semester-header');
+                  
+                  const semesterTitle = document.createElement('h4');
+                  semesterTitle.classList.add('semester-title');
+                  semesterTitle.textContent = `Semester ${semester.semester}`;
+                  
+                  const sgpaValue = document.createElement('div');
+                  sgpaValue.classList.add('sgpa-value');
+                  sgpaValue.textContent = `SGPA: ${semester.sgpa}`;
+                  
+                  const semesterActions = document.createElement('div');
+                  semesterActions.classList.add('card-actions');
+                  
+                  const editSemesterBtn = document.createElement('button');
+                  editSemesterBtn.classList.add('action-btn', 'edit-btn');
+                  editSemesterBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                  editSemesterBtn.title = 'Edit Semester';
+                  editSemesterBtn.addEventListener('click', function() {
+                    openEditModal('semester', semester.semester, program, institution, semester.sgpa);
+                  });
+                  
+                  const deleteSemesterBtn = document.createElement('button');
+                  deleteSemesterBtn.classList.add('action-btn', 'delete-btn');
+                  deleteSemesterBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                  deleteSemesterBtn.title = 'Delete Semester';
+                  deleteSemesterBtn.addEventListener('click', function() {
+                    openDeleteModal('semester', semester.semester, program, institution);
+                  });
+                  
+                  semesterActions.appendChild(editSemesterBtn);
+                  semesterActions.appendChild(deleteSemesterBtn);
+                  
+                  semesterHeader.appendChild(semesterTitle);
+                  semesterHeader.appendChild(sgpaValue);
+                  semesterHeader.appendChild(semesterActions);
+                  semesterCard.appendChild(semesterHeader);
+                  
+                  // Add semester card to container
+                  semestersContainer.appendChild(semesterCard);
+                });
+                
+                // Add semesters container to program section
+                programSection.appendChild(semestersContainer);
+                
+                // Add program section to programs container
+                programsContainer.appendChild(programSection);
+              }
+            }
+            
+            // Add programs container to institution card
+            institutionCard.appendChild(programsContainer);
+            
+            // Add institution card to dashboard grid
+            dashboardGrid.appendChild(institutionCard);
+          }
+        }
+        
+        // Add dashboard grid to dashboard
+        dashboard.appendChild(dashboardGrid);
+      }
+
+      // Calculate CGPA from semesters
+      function calculateCGPA(semesters) {
+        if (!semesters || semesters.length === 0) return "0.00";
+        
+        let totalSGPA = 0;
+        semesters.forEach(semester => {
+          totalSGPA += parseFloat(semester.sgpa);
+        });
+        
+        const cgpa = totalSGPA / semesters.length;
+        return cgpa.toFixed(2);
+      }
+
+      // Function to open edit modal
+      function openEditModal(type, name, program = null, institution = null, currentValue = null) {
+        const modal = document.getElementById('modalContainer');
+        const overlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalContent = document.getElementById('modalContent');
+        const saveButton = document.getElementById('saveModal');
+        
+        // Set modal title
+        modalTitle.textContent = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        
+        // Generate modal content based on type
+        let content = '';
+        
+        if (type === 'institution') {
+          content = `
+            <div class="form-group">
+              <label for="editName">Institution Name</label>
+              <input type="text" id="editName" class="form-input" value="${name}" placeholder="Enter institution name">
+            </div>
+          `;
+        } else if (type === 'program') {
+          content = `
+            <div class="form-group">
+              <label for="editName">Program Name</label>
+              <input type="text" id="editName" class="form-input" value="${name}" placeholder="Enter program name">
+            </div>
+            <div class="form-info">
+              <p>Institution: ${institution}</p>
+            </div>
+          `;
+        } else if (type === 'semester') {
+          content = `
+            <div class="form-group">
+              <label for="editSGPA">SGPA Value</label>
+              <input type="number" id="editSGPA" class="form-input" value="${currentValue}" min="0" max="10" step="0.01" placeholder="Enter SGPA value">
+            </div>
+            <div class="form-info">
+              <p>Semester: ${name}</p>
+              <p>Program: ${program}</p>
+              <p>Institution: ${institution}</p>
+            </div>
+          `;
+        }
+        
+        modalContent.innerHTML = content;
+        
+        // Store data for saving
+        saveButton.dataset.type = type;
+        saveButton.dataset.name = name;
+        saveButton.dataset.isDelete = 'false';
+        if (program) saveButton.dataset.program = program;
+        if (institution) saveButton.dataset.institution = institution;
+        
+        // Show modal and overlay
+        modal.classList.add('open');
+        overlay.classList.add('visible');
+      }
+
+      // Function to open delete modal
+      function openDeleteModal(type, name, program = null, institution = null) {
+        const modal = document.getElementById('modalContainer');
+        const overlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalContent = document.getElementById('modalContent');
+        const saveButton = document.getElementById('saveModal');
+        
+        // Set modal title and button text
+        modalTitle.textContent = `Delete ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        saveButton.textContent = 'Delete';
+        saveButton.classList.add('btn-delete');
+        
+        // Generate delete confirmation message
+        let deleteMessage = '';
+        
+        if (type === 'institution') {
+          deleteMessage = `Are you sure you want to delete institution "${name}"? This will delete all programs and semesters within it.`;
+        } else if (type === 'program') {
+          deleteMessage = `Are you sure you want to delete program "${name}" from institution "${institution}"?`;
+        } else if (type === 'semester') {
+          deleteMessage = `Are you sure you want to delete Semester ${name} from program "${program}"?`;
+        }
+        
+        // Generate modal content
+        const content = `
+          <div class="delete-confirmation">
+            <div class="warning-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>Confirm Deletion</h3>
+            <p>${deleteMessage}</p>
+            <p>This action cannot be undone.</p>
+          </div>
+        `;
+        
+        modalContent.innerHTML = content;
+        
+        // Store data for deletion
+        saveButton.dataset.type = type;
+        saveButton.dataset.name = name;
+        saveButton.dataset.isDelete = 'true';
+        if (program) saveButton.dataset.program = program;
+        if (institution) saveButton.dataset.institution = institution;
+        
+        // Show modal and overlay
+        modal.classList.add('open');
+        overlay.classList.add('visible');
+      }
+
+      // Function to close the modal
+      function closeModal() {
+        const modal = document.getElementById('modalContainer');
+        const overlay = document.getElementById('modalOverlay');
+        const saveButton = document.getElementById('saveModal');
+        
+        modal.classList.remove('open');
+        overlay.classList.remove('visible');
+        
+        // Reset save button
+        saveButton.textContent = 'Save Changes';
+        saveButton.classList.remove('btn-delete');
+      }
+
+      // Function to handle modal actions (save or delete)
+      function handleModalAction() {
+        const saveButton = document.getElementById('saveModal');
+        const type = saveButton.dataset.type;
+        const name = saveButton.dataset.name;
+        const program = saveButton.dataset.program;
+        const institution = saveButton.dataset.institution;
+        const isDelete = saveButton.dataset.isDelete === 'true';
+        
+        if (isDelete) {
+          // Handle deletion
+          deleteItem(type, name, program, institution);
+        } else {
+          // Handle saving
+          if (type === 'institution') {
+            const newName = document.getElementById('editName').value.trim();
+            saveInstitutionDetails(name, newName);
+          } else if (type === 'program') {
+            const newName = document.getElementById('editName').value.trim();
+            saveProgramDetails(name, newName, institution);
+          } else if (type === 'semester') {
+            const newValue = document.getElementById('editSGPA').value.trim();
+            saveSemesterDetails(newValue, name, program, institution);
+          }
+        }
+        
+        closeModal();
+      }
+
+      // Function to delete an item
+      function deleteItem(type, name, program = null, institution = null) {
+        let itemName;
+        
+        if (type === 'semester') {
+          itemName = `Semester ${name} of program ${program}`;
+        } else {
+          itemName = name;
+        }
+        
+        $.ajax({
+          type: "POST",
+          url: "/delete_item.php",
+          data: { 
+            item_type: type, 
+            item_name: itemName, 
+            institution_name: institution 
+          },
+          success: function(response) {
+            if(response === 'success') {
+              createToast('success', `${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully`);
+              fetchSGPAData(); // Refresh data
+            } else {
+              createToast('error', response);
+            }
+          },
+          error: function() {
+            createToast('error', 'Failed to delete item. Please try again.');
+          }
+        });
+      }
+
+      // Function to save institution details
+      function saveInstitutionDetails(oldName, newName) {
+        $.ajax({
+          type: "POST",
+          url: "/save_institution_details.php",
+          data: { old_name: oldName, new_name: newName },
+          success: function(response) {
+            if(response === 'success') {
+              createToast('success', 'Institution details saved successfully!');
+              fetchSGPAData(); // Refresh data
+            } else {
+              createToast('error', response);
+            }
+          },
+          error: function() {
+            createToast('error', 'Failed to save institution details. Please try again.');
+          }
+        });
+      }
+
+      // Function to save program details
+      function saveProgramDetails(oldName, newName, institutionName) {
+        $.ajax({
+          type: "POST",
+          url: "/save_program_details.php",
+          data: { 
+            old_name: oldName, 
+            new_name: newName, 
+            institution_name: institutionName 
+          },
+          success: function(response) {
+            if(response === 'success') {
+              createToast('success', 'Program details saved successfully!');
+              fetchSGPAData(); // Refresh data
+            } else {
+              createToast('error', response);
+            }
+          },
+          error: function() {
+            createToast('error', 'Failed to save program details. Please try again.');
+          }
+        });
+      }
+
+      // Function to save semester details
+      function saveSemesterDetails(newValue, semester, programName, institutionName) {
+        $.ajax({
+          type: "POST",
+          url: "/save_semester_details.php",
+          data: { 
+            new_sgpa: newValue, 
+            semester: semester, 
+            program_name: programName, 
+            institution_name: institutionName 
+          },
+          success: function(response) {
+            if(response === 'success') {
+              createToast('success', 'Semester details saved successfully!');
+              fetchSGPAData(); // Refresh data
+            } else {
+              createToast('error', response);
+            }
+          },
+          error: function() {
+            createToast('error', 'Failed to save semester details. Please try again.');
+          }
+        });
+      }
+
+      // Function to create toast notifications
+      function createToast(type, message) {
+        var toastContainer = document.querySelector('.toast-container');
+        var toast = document.createElement("div");
+        toast.classList.add("toast", type);
+        toast.innerHTML = '<span>' + message + '</span>' +
+                          '<i class="fas fa-times-circle close-icon"></i>';
+        toastContainer.appendChild(toast);
+        toast.querySelector('.close-icon').addEventListener('click', function(){
+          toast.remove();
+        });
+        setTimeout(function(){
+          toast.remove();
+        }, 3000);
+      }
+
+      // Event listeners for modal
+      document.getElementById('closeModal').addEventListener('click', closeModal);
+      document.getElementById('cancelModal').addEventListener('click', closeModal);
+      document.getElementById('saveModal').addEventListener('click', handleModalAction);
+      document.getElementById('modalOverlay').addEventListener('click', closeModal);
+
+      // Navigation bar toggle
+      const navBar = document.querySelector("nav");
+      const menuBtns = document.querySelectorAll(".menu-icon");
+      const overlay = document.querySelector(".overlay");
+
+      menuBtns.forEach((menuBtn) => {
+        menuBtn.addEventListener("click", () => {
+          navBar.classList.toggle("open");
+        });
+      });
+
+      overlay.addEventListener("click", () => {
+        navBar.classList.remove("open");
+      });
+
+      // Fetch SGPA data when the DOM content is loaded
+      fetchSGPAData();
+    });
+  </script>
+
+  <style>
+    body {
+      display: none;
+      font-family: 'Poppins', sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+
+    .dashboard-header {
+      margin-bottom: 2rem;
+    }
+
+    .dashboard-header h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #2d3748;
+    }
+
+    .dashboard-header p {
+      color: #718096;
+      font-size: 1rem;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .institution-card {
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .institution-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05), 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .institution-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem;
+      background-color: #10a37f;
+      color: white;
+    }
+
+    .institution-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .programs-container {
+      padding: 1rem;
+    }
+
+    .program-section {
+      background-color: #f8fafc;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .program-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background-color: #e6f7f2;
+      border-bottom: 1px solid #d1e9e3;
+    }
+
+    .program-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .program-name {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin: 0;
+      color: #2d3748;
+    }
+
+    .cgpa-badge {
+      background-color: #10a37f;
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .semesters-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 0.75rem;
+      padding: 1rem;
+    }
+
+    .semester-card {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      transition: transform 0.2s;
+    }
+
+    .semester-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .semester-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .semester-title {
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 0;
+      color: #4a5568;
+    }
+
+    .sgpa-value {
+      font-size: 0.875rem;
+      color: #718096;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-container {
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(20px);
+      opacity: 0;
+      visibility: hidden;
+      transition: transform 0.3s, opacity 0.3s, visibility 0.3s;
+    }
+
+    .modal-container.open {
+      transform: translateY(0);
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-header h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      color: #2d3748;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      color: #718096;
+    }
+
+    .close-modal:hover {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .modal-content {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      padding: 1.25rem 1.5rem;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .btn {
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+      border: none;
+    }
+
+    .btn-cancel {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .btn-cancel:hover {
+      background-color: #e5e7eb;
+    }
+
+    .btn-save {
+      background-color: #10a37f;
+      color: white;
+    }
+
+    .btn-save:hover {
+      background-color: #0e8c6d;
+    }
+
+    .btn-delete {
+      background-color: #ef4444;
+      color: white;
+    }
+
+    .btn-delete:hover {
+      background-color: #dc2626;
+    }
+
+    .btn-primary {
+      background-color: #10a37f;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      text-decoration: none;
+      display: inline-block;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .btn-primary:hover {
+      background-color: #0e8c6d;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #4b5563;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #10a37f;
+      box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+    }
+
+    .form-info {
+      background-color: #f8fafc;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .form-info p {
+      margin: 0.5rem 0;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      color: #cbd5e1;
+      margin-bottom: 1.5rem;
+    }
+
+    .empty-state h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #334155;
+    }
+
+    .empty-state p {
+      color: #64748b;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Error message */
+    .error-message {
+      text-align: center;
+      padding: 2rem;
+      background-color: #fee2e2;
+      border-radius: 8px;
+      color: #b91c1c;
+    }
+
+    .error-message i {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Action buttons with improved contrast */
+    .action-btn {
+      background: none;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .institution-header .action-btn {
+      color: rgba(255, 255, 255, 0.9);
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .institution-header .edit-btn:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+    }
+
+    .institution-header .delete-btn:hover {
+      background-color: rgba(239, 68, 68, 0.3);
+      color: #ffffff;
+    }
+
+    .program-section .action-btn,
+    .semester-card .action-btn {
+      color: #4b5563;
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .program-section .edit-btn:hover,
+    .semester-card .edit-btn:hover {
+      background-color: rgba(16, 163, 127, 0.1);
+      color: #10a37f;
+    }
+
+    .program-section .delete-btn:hover,
+    .semester-card .delete-btn:hover {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+
+    /* Delete confirmation styles */
+    .delete-confirmation {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .delete-confirmation .warning-icon {
+      font-size: 3rem;
+      color: #ef4444;
+      margin-bottom: 1rem;
+    }
+
+    .delete-confirmation h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: #1f2937;
+    }
+
+    .delete-confirmation p {
+      margin-bottom: 1.5rem;
+      color: #4b5563;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .semesters-container {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      }
+      
+      .modal-container {
+        width: 95%;
+        max-height: 80vh;
+      }
+    }
+  </style>
+</body>
+
+</html>
+
